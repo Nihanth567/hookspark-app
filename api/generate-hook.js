@@ -1,22 +1,34 @@
+import { Configuration, OpenAIApi } from "openai";
+
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
+
 export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   const { topic } = req.body;
 
-  const response = await fetch('https://api.openai.com/v1/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-davinci-003',
-      prompt: `Write a viral TikTok hook for this topic: ${topic}`,
-      temperature: 0.8,
-      max_tokens: 50,
-    }),
-  });
+  if (!topic) {
+    return res.status(400).json({ error: "Topic is required" });
+  }
 
-  const data = await response.json();
-  const hook = data.choices?.[0]?.text?.trim();
+  try {
+    const prompt = `Give me a super catchy short viral TikTok hook about: ${topic}`;
 
-  res.status(200).json({ hook });
+    const completion = await openai.createChatCompletion({
+      model: "gpt-4",
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const response = completion.data.choices[0].message.content;
+
+    res.status(200).json({ hook: response });
+  } catch (error) {
+    console.error("OpenAI API error:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to generate hook" });
+  }
 }
